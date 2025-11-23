@@ -17,6 +17,8 @@ import SelfAssess from "./pages/SelfAssess";
 import Recommendations from "./pages/Recommendations";
 import Syllabus from "./pages/Syllabus";
 import Assigned from "./pages/Assigned";
+import VoiceTutorPage from "./pages/VoiceTutorPage";
+import AssignmentsPage from "./pages/assignments";
 
 const FONT_STACK =
   'Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif';
@@ -40,7 +42,13 @@ export default function App() {
           <Route path="recommendations" element={<Recommendations />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="assigned" element={<Assigned />} />
+          <Route path="voice" element={<VoiceTutorPage />} />
+        
         </Route>
+        <Route path="/teacher" element={<Navigate to="/teacher" replace />} />
+        
+          <Route path="assignments" element={<AssignmentsPage />} />
+        
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

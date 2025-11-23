@@ -112,6 +112,7 @@ async function submitTextAPI({ question, submitted_text = "", time_taken_seconds
 function normalizeTopicTitle(x) {
   if (!x) return "";
   if (typeof x === "string") return x;
+  // Try common keys
   return x.name || x.title || x.topic || x.topic_title || "";
 }
 
@@ -306,7 +307,7 @@ function RecommendationCard({ rec, onStart }) {
         {(cs.definition || cs.types || cs.formulas || cs.rules || cs.method || (cs.other || []).length > 0) && (
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ fontWeight: 700 }}>Concept Sheet</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repea t(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
               {cs.definition && (
                 <div style={{ border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 10 }}>
                   <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Definition</div>
@@ -444,9 +445,11 @@ function RecommendationCard({ rec, onStart }) {
           </div>
         )}
 
-        {/* Actions: wire to loop */}
+        {/* Actions (hook up to flows as desired) */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-         
+          <Button size="sm" onClick={() => onStart?.("mcq", rec)}>Start MCQs</Button>
+          <Button size="sm" variant="secondary" onClick={() => onStart?.("flash", rec)}>Start Flashcards</Button>
+          <Button size="sm" variant="ghost" onClick={() => onStart?.("interview", rec)}>Start Interview</Button>
         </div>
       </div>
     </div>
@@ -648,10 +651,6 @@ export default function SelfAssess(props) {
   const [nextTopic, setNextTopic] = useState(null); // optional if backend returns
   const recsRef = useRef(null);
 
-  // loop controls
-  const [autoLoopEnabled, setAutoLoopEnabled] = useState(true);
-  const [loopTake, setLoopTake] = useState(1); // how many top recs to practice next
-
   // Remember the last topics we actually loaded content for (for precise recs)
   const [lastLoadedTopics, setLastLoadedTopics] = useState([]);
 
@@ -700,47 +699,26 @@ export default function SelfAssess(props) {
       [id]: typeof val === "function" ? val(prev[id] || "") : val,
     }));
 
-  /* ------------------- helpers for LOOP ------------------- */
-  function topicsFromRecs(arr = []) {
-    return arr
-      .map((r) => normalizeTopicTitle(r.title || r.topic || r.next_topic || ""))
-      .filter(Boolean);
-  }
-
-  async function generateAndLoadMCQsForTopics(titles, { n = countEach } = {}) {
-    if (!titles || !titles.length) return;
+  /* ------------------- GENERATE then LIST ------------------- */
+  async function generateThenListMCQs() {
+    const titles = selectedTopicTitles();
+    if (!titles.length) return;
     setBusy(true);
     try {
       for (const tt of titles) {
         await generateMCQsAPI({
           topic_title: tt,
-          n,
+          n: countEach,
           difficulty: apiDiff === "ALL" ? "MEDIUM" : apiDiff,
         });
       }
-      // After generation, list only those topics’ MCQs into preview
-      const all = [];
-      for (const tt of titles) {
-        const list = await listMCQsAPI({ topic_title: tt, difficulty: apiDiff, limit: n });
-        all.push(...list);
-      }
-      setPreview((p) => ({ ...p, mcqs: all.slice(0, n) }));
-      setSubmittedType((s) => ({ ...s, MCQ: false }));
-      const loadedTopics = new Set(all.map((q) => normalizeTopicTitle(q?.topic)).filter(Boolean));
-      setLastLoadedTopics(Array.from(loadedTopics));
+      await loadMCQs(false);
       setTab("MCQ");
     } catch (e) {
-      alert(`Loop MCQ generation failed: ${e.message}`);
+      alert(`Generate MCQs failed: ${e.message}`);
     } finally {
       setBusy(false);
     }
-  }
-
-  /* ------------------- GENERATE then LIST ------------------- */
-  async function generateThenListMCQs() {
-    const titles = selectedTopicTitles();
-    if (!titles.length) return;
-    await generateAndLoadMCQsForTopics(titles, { n: countEach });
   }
   async function generateThenListFlashcards() {
     const titles = selectedTopicTitles();
@@ -796,6 +774,7 @@ export default function SelfAssess(props) {
       }
       setPreview((p) => ({ ...p, mcqs: all.slice(0, countEach) }));
       setSubmittedType((s) => ({ ...s, MCQ: false }));
+      // Remember topics we just actually loaded
       const loadedTopics = new Set(all.map((q) => normalizeTopicTitle(q?.topic)).filter(Boolean));
       setLastLoadedTopics(Array.from(loadedTopics));
       if (setActiveTab) setTab("MCQ");
@@ -872,7 +851,7 @@ export default function SelfAssess(props) {
 
     // 3) If still empty, fall back to selected chips
     if (!topicsWanted.length) topicsWanted = selectedTopicTitles();
-    if (!topicsWanted.length) return [];
+    if (!topicsWanted.length) return;
 
     try {
       setRecsError(null);
@@ -885,7 +864,7 @@ export default function SelfAssess(props) {
         title: it.title || it.topic || "Study guide",
         masteryPct: normalizePct(it.mastery),
         riskPct: normalizePct(it.risk),
-        yt: it.youtube || it.yt || null,
+        yt: it.youtube || it.yt || null, // normalize youtube field for UI
         concept_sheet: Array.isArray(it.concept_sheet) ? it.concept_sheet : [],
         confusions: Array.isArray(it.confusions) ? it.confusions : [],
         mini_lab: it.mini_lab || null,
@@ -896,16 +875,14 @@ export default function SelfAssess(props) {
 
       setRecs(normalized);
       if (!Array.isArray(raw) && raw?.next_topic) setNextTopic(raw.next_topic);
-      return normalized;
     } catch (e) {
       setRecsError(e.message || "Failed to load recommendations");
       setRecs([]);
       setNextTopic(null);
-      return [];
     }
   }
 
-  /* ------------------- SUBMIT (now loops) ------------------- */
+  /* ------------------- SUBMIT ------------------- */
   async function submitAllMCQs() {
     if (!preview.mcqs.length) return;
     setBusy(true);
@@ -922,16 +899,8 @@ export default function SelfAssess(props) {
       }
       setResults((prev) => ({ ...prev, ...resMap }));
       setSubmittedType((s) => ({ ...s, MCQ: true }));
-      const newRecs = await loadRecommendations();
+      await loadRecommendations();
       scrollToRecommendations();
-
-      // ---- LOOP: auto-generate MCQs for top recommended topics ----
-      if (autoLoopEnabled && newRecs.length) {
-        const nextTitles = topicsFromRecs(newRecs).slice(0, Math.max(1, Number(loopTake) || 1));
-        if (nextTitles.length) {
-          await generateAndLoadMCQsForTopics(nextTitles, { n: countEach });
-        }
-      }
     } catch (e) {
       alert(`Submitting MCQs failed: ${e.message}`);
     } finally {
@@ -954,15 +923,8 @@ export default function SelfAssess(props) {
       }
       setResults((prev) => ({ ...prev, ...resMap }));
       setSubmittedType((s) => ({ ...s, FLASH: true }));
-      const newRecs = await loadRecommendations();
+      await loadRecommendations();
       scrollToRecommendations();
-
-      if (autoLoopEnabled && newRecs.length) {
-        const nextTitles = topicsFromRecs(newRecs).slice(0, Math.max(1, Number(loopTake) || 1));
-        if (nextTitles.length) {
-          await generateAndLoadMCQsForTopics(nextTitles, { n: countEach });
-        }
-      }
     } catch (e) {
       alert(`Submitting flashcards failed: ${e.message}`);
     } finally {
@@ -985,15 +947,8 @@ export default function SelfAssess(props) {
       }
       setResults((prev) => ({ ...prev, ...resMap }));
       setSubmittedType((s) => ({ ...s, INT: true }));
-      const newRecs = await loadRecommendations();
+      await loadRecommendations();
       scrollToRecommendations();
-
-      if (autoLoopEnabled && newRecs.length) {
-        const nextTitles = topicsFromRecs(newRecs).slice(0, Math.max(1, Number(loopTake) || 1));
-        if (nextTitles.length) {
-          await generateAndLoadMCQsForTopics(nextTitles, { n: countEach });
-        }
-      }
     } catch (e) {
       alert(`Submitting interview answers failed: ${e.message}`);
     } finally {
@@ -1005,7 +960,7 @@ export default function SelfAssess(props) {
   return (
     <Card
       title="Self Assess"
-      subtitle="Pick topics • per-type APIs (generate/list/submit) • Updates knowledge on submit • Auto-loop from recommendations"
+      subtitle="Pick topics • per-type APIs (generate/list/submit) • Updates knowledge on submit"
       right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
@@ -1108,40 +1063,6 @@ export default function SelfAssess(props) {
                   value={countEach}
                   onChange={(v) => setCountEach(Math.max(1, Number(v) || 10))}
                 />
-              </div>
-
-              {/* LOOP controls */}
-              <div
-                style={{
-                  border: `1px dashed ${THEME.border}`,
-                  borderRadius: 10,
-                  padding: 10,
-                  display: "grid",
-                  gap: 8,
-                  background: "#fcfcff",
-                }}
-              >
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <input
-                    id="autoLoop"
-                    type="checkbox"
-                    checked={autoLoopEnabled}
-                    onChange={(e) => setAutoLoopEnabled(e.target.checked)}
-                  />
-                  <label htmlFor="autoLoop" style={{ fontWeight: 600 }}>
-                    Auto-loop: generate MCQs from recommendations after submit
-                  </label>
-                </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <div style={{ fontSize: 12, color: THEME.subtext }}>Practice top</div>
-                  <Input
-                    type="number"
-                    value={loopTake}
-                    onChange={(v) => setLoopTake(Math.max(1, Math.min(5, Number(v) || 1)))}
-                    style={{ width: 64 }}
-                  />
-                  <div style={{ fontSize: 12, color: THEME.subtext }}>recommended topic(s)</div>
-                </div>
               </div>
 
               {/* Actions */}
@@ -1281,28 +1202,23 @@ export default function SelfAssess(props) {
           </div>
         )}
 
-        {/* ------------------- Recommendations (loop entry) ------------------- */}
+        {/* ------------------- Recommendations (Recommendations.jsx style) ------------------- */}
         <Divider />
         <div ref={recsRef} />
         <div style={{ display: "grid", gap: 8 }}>
           <SectionTitle>Recommendations</SectionTitle>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button
               variant="ghost"
-              onClick={async () => {
-                const newRecs = await loadRecommendations();
+              onClick={() => {
+                loadRecommendations();
                 scrollToRecommendations();
-                if (autoLoopEnabled && newRecs.length) {
-                  const nextTitles = topicsFromRecs(newRecs).slice(0, Math.max(1, Number(loopTake) || 1));
-                  if (nextTitles.length) await generateAndLoadMCQsForTopics(nextTitles, { n: countEach });
-                }
               }}
               disabled={busy}
             >
               Refresh Recommendations
             </Button>
             {nextTopic?.title && <Tag tone="info">Next: {nextTopic.title}</Tag>}
-            {autoLoopEnabled && <Tag tone="success">Auto-loop ON</Tag>}
           </div>
 
           {recsError && (
@@ -1323,16 +1239,9 @@ export default function SelfAssess(props) {
                 <RecommendationCard
                   key={r.id || r.title}
                   rec={r}
-                  onStart={async (mode) => {
-                    // Loop entry by card
-                    if (mode === "mcq") {
-                      const title = normalizeTopicTitle(r.title || r.topic);
-                      if (title) await generateAndLoadMCQsForTopics([title], { n: countEach });
-                    } else if (mode === "flash") {
-                      alert("Hook up flashcard generation here if desired.");
-                    } else if (mode === "interview") {
-                      alert("Hook up interview generation here if desired.");
-                    }
+                  onStart={(mode) => {
+                    // Wire this to your practice flows if desired
+                    alert(`Start ${mode} for ${r.title}`);
                   }}
                 />
               ))}

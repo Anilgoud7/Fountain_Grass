@@ -12,7 +12,7 @@ import {
 } from "../components/ui";
 
 /* ------------------- API + helpers ------------------- */
-const API_BASE = import.meta?.env?.VITE_API_BASE || "http://127.0.0.1:9000";
+const API_BASE = import.meta?.env?.VITE_API_BASE || "http://localhost:8000";
 
 function getCSRFToken() {
   const m = document.cookie.match(/csrftoken=([^;]+)/);
@@ -90,26 +90,13 @@ async function listInterviewsAPI({ topic_title, difficulty = "ALL", limit = 50 }
   return Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
 }
 
-/* ------------------- LocalStorage helpers ------------------- */
-const LS_PREFIX = "student_";
-const LS_SUFFIX = "_assignments";
-
-function lsKey(studentId) {
-  return `${LS_PREFIX}${studentId}${LS_SUFFIX}`;
-}
-
-function loadAssignmentsForLocal(studentId) {
-  try {
-    return JSON.parse(localStorage.getItem(lsKey(studentId)) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveAssignmentToLocal(studentId, assignment) {
-  const prev = loadAssignmentsForLocal(studentId);
-  prev.push(assignment);
-  localStorage.setItem(lsKey(studentId), JSON.stringify(prev));
+/* -- assignments endpoint -- */
+async function createAssignmentAPI(payload) {
+  // expected: { title, description?, due_at?, items:[{type:"MCQ"|"FLASH"|"INT", id:string}], class_id?, student_ids? }
+  return jsonFetch(`${API_BASE}/api/assignments/create/`, {
+    method: "POST",
+    body: payload,
+  });
 }
 
 /* ------------------- Normalizers (same spirit as SelfAssess) ------------------- */
@@ -163,13 +150,8 @@ const TopicChip = ({ active, onClick, children }) => (
   </button>
 );
 
-/* Cards styled like SelfAssess, but with a single checkbox to select the item
-   and options displayed with A, B, C, D labels + radio selection (local-only) */
+/* Cards styled like SelfAssess, but with a single checkbox to select the item */
 function MCQSelectableCard({ q, checked, onToggle }) {
-  const [selected, setSelected] = useState(null); // local radio selection (not persisted here)
-
-  const choiceLetter = (i) => String.fromCharCode(65 + i); // 0->A, 1->B...
-
   return (
     <div
       style={{
@@ -194,38 +176,10 @@ function MCQSelectableCard({ q, checked, onToggle }) {
       )}
 
       {Array.isArray(q.options) && q.options.length > 0 && (
-        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 6 }}>
-          {q.options.slice(0, 4).map((opt, i) => {
-            const letter = choiceLetter(i);
-            const name = `mcq_${q.id}`; // radio group per question
-            const id = `${name}_${i}`;
-            return (
-              <li key={i}>
-                <label
-                  htmlFor={id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    border: `1px solid ${THEME.border}`,
-                    borderRadius: 8,
-                    padding: "8px 10px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    id={id}
-                    type="radio"
-                    name={name}
-                    checked={selected === i}
-                    onChange={() => setSelected(i)}
-                  />
-                  <span style={{ fontWeight: 700, minWidth: 18 }}>{letter}.</span>
-                  <span>{opt}</span>
-                </label>
-              </li>
-            );
-          })}
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          {q.options.map((opt, i) => (
+            <li key={i} style={{ marginBottom: 2 }}>{opt}</li>
+          ))}
         </ul>
       )}
 
@@ -295,7 +249,7 @@ export default function AssignmentsPage(props) {
   // assignment meta
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
-  const [classId, setClassId] = useState(""); // optional (not used in local save, but kept for UI)
+  const [classId, setClassId] = useState(""); // optional
   const [studentIds, setStudentIds] = useState(""); // optional comma-separated
 
   // subject change → reset (with safe fallback topics)
@@ -382,82 +336,38 @@ export default function AssignmentsPage(props) {
     }
   }
 
-  /* ------------------- local assign helpers ------------------- */
-  function gatherSelectedItemsDetailed() {
-    const mcqItems = mcqs
-      .filter((q) => selMCQ[q.id])
-      .map((q) => ({
-        type: "MCQ",
-        id: q.id,
-        prompt: q.prompt,
-        topic: q.topic,
-        difficulty: q.difficulty,
-        options: q.options,
-        correct_answers: q.correct_answers,
-        explanation: q.explanation,
-      }));
-
-    const flItems = flash
-      .filter((q) => selFLASH[q.id])
-      .map((q) => ({
-        type: "FLASH",
-        id: q.id,
-        prompt: q.prompt,
-        topic: q.topic,
-        difficulty: q.difficulty,
-      }));
-
-    const intItems = ints
-      .filter((q) => selINT[q.id])
-      .map((q) => ({
-        type: "INT",
-        id: q.id,
-        prompt: q.prompt,
-        topic: q.topic,
-        difficulty: q.difficulty,
-      }));
-
+  /* ------------------- assign ------------------- */
+  function gatherSelectedItems() {
+    const mcqItems = mcqs.filter((q) => selMCQ[q.id]).map((q) => ({ type: "MCQ", id: q.id }));
+    const flItems = flash.filter((q) => selFLASH[q.id]).map((q) => ({ type: "FLASH", id: q.id }));
+    const intItems = ints.filter((q) => selINT[q.id]).map((q) => ({ type: "INT", id: q.id }));
     return [...mcqItems, ...flItems, ...intItems];
   }
 
   async function handleAssign() {
-    const items = gatherSelectedItemsDetailed();
+    const items = gatherSelectedItems();
     if (!items.length) {
       alert("Select at least one item to assign.");
       return;
     }
-    const ids = (studentIds || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    if (!ids.length) {
-      alert("Provide at least one Student ID (e.g., dummy1).");
-      return;
-    }
-
-    const assignment = {
-      id: `as_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    const payload = {
       title: title || "Practice Set",
-      description: `Local practice set with ${items.length} items`,
-      subject_id: activeSubject?.id || null,
+      description: `Auto-created from Assignments page (${items.length} items)`,
       due_at: dueAt || null,
-      created_at: new Date().toISOString(),
       items,
-      progress: {
-        // basic slot for student-side view; per-item results can be stored there
-        status: "ASSIGNED",
-        done_count: 0,
-        total: items.length,
-      },
+      class_id: classId || null,
+      student_ids: (studentIds || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      subject_id: activeSubject?.id || null,
     };
-
     try {
-      ids.forEach((sid) => saveAssignmentToLocal(sid, assignment));
-      alert(`Saved locally for: ${ids.join(", ")}`);
+      await createAssignmentAPI(payload);
+      alert("Assignment created!");
       setSelMCQ({}); setSelFLASH({}); setSelINT({});
     } catch (e) {
-      alert(`Local save failed: ${e.message}`);
+      alert(`Create assignment failed: ${e.message}`);
     }
   }
 
@@ -465,7 +375,7 @@ export default function AssignmentsPage(props) {
   return (
     <Card
       title="Assignments"
-      subtitle="Generate/Load content • Select items • Assign locally to student IDs (comma-separated)"
+      subtitle="Generate or load content by topic • Select items • Assign to class or students"
       right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
@@ -728,21 +638,21 @@ function AssignBlock({
         </div>
         <div>
           <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Class ID (optional)</div>
-          <Input value={classId} onChange={setClassId} placeholder="e.g., 10A (not used for local save)" />
+          <Input value={classId} onChange={setClassId} placeholder="e.g., 10A" />
         </div>
       </div>
       <div>
         <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>
-          Student IDs (comma-separated) — e.g., <code>dummy1, dummy2</code>
+          Student IDs (optional, comma-separated)
         </div>
         <Input
           value={studentIds}
           onChange={setStudentIds}
-          placeholder="dummy1, dummy2"
+          placeholder="s101, s102, s103"
         />
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <Button onClick={onAssign} disabled={disabled}>Assign (Save to Local)</Button>
+        <Button onClick={onAssign} disabled={disabled}>Assign</Button>
       </div>
     </div>
   );

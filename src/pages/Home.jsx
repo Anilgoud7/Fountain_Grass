@@ -40,7 +40,7 @@ function Header() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div
-          aria-label="Qboxai"
+          aria-label="Qboxai IIT"
           style={{
             width: 36,
             height: 36,
@@ -54,19 +54,28 @@ function Header() {
         >
           Q
         </div>
-        <div style={{ fontWeight: 800, fontSize: 18 }}>Qboxai</div>
-    
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Qboxai • IIT Foundation</div>
       </div>
 
       <nav style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <a href="#features" style={{ color: THEME.subtext, textDecoration: "none", fontSize: 14 }}>Features</a>
-        <a href="#how" style={{ color: THEME.subtext, textDecoration: "none", fontSize: 14 }}>How it works</a>
-        <a href="#faq" style={{ color: THEME.subtext, textDecoration: "none", fontSize: 14 }}>FAQ</a>
+        <a href="#features" style={{ color: THEME.subtext, textDecoration: "none", fontSize: 14 }}>
+          Features
+        </a>
+        <a href="#how" style={{ color: THEME.subtext, textDecoration: "none", fontSize: 14 }}>
+          How it works
+        </a>
+        <a href="#faq" style={{ color: THEME.subtext, textDecoration: "none", fontSize: 14 }}>
+          FAQ
+        </a>
       </nav>
 
       <div style={{ display: "flex", gap: 8 }}>
-        <Link to="/signin"><Button variant="soft">Sign in</Button></Link>
-        <Link to="/signup"><Button>Sign up</Button></Link>
+        <Link to="/signin">
+          <Button variant="soft">Sign in</Button>
+        </Link>
+        <Link to="/signup">
+          <Button>Sign up</Button>
+        </Link>
       </div>
     </header>
   );
@@ -78,7 +87,7 @@ function Hero() {
     <Card
       style={{
         padding: 40,
-        background: "linear-gradient(180deg, #ffffff 0%, #f5f8ff 100%)",
+        background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
         position: "relative",
         overflow: "hidden",
         textAlign: "center",
@@ -86,18 +95,23 @@ function Hero() {
       right={<span />}
       title={
         <span style={{ fontSize: 36, fontWeight: 900 }}>
-          Make your school, <span style={{ color: THEME.primary }}>AI Tech School</span>
+          Build top Olympiad & IIT Foundation readiness — <span style={{ color: THEME.primary }}>Systematically</span>
         </span>
       }
-    
     >
       <GlowRings />
       <div style={{ marginTop: 24, display: "grid", gap: 16 }}>
         <SubTagline />
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link to="/signup"><Button className="pulse-btn">Get started — Sign up</Button></Link>
-          <Link to="/signin"><Button variant="soft">I already have an account</Button></Link>
-          <a href="#how" style={{ textDecoration: "none" }}><Button variant="soft">See how it works</Button></a>
+          <Link to="/signup">
+            <Button className="pulse-btn">Get started — Join foundation track</Button>
+          </Link>
+          <Link to="/signin">
+            <Button variant="soft">I already have an account</Button>
+          </Link>
+          <a href="#how" style={{ textDecoration: "none" }}>
+            <Button variant="soft">See how it works</Button>
+          </a>
         </div>
         <style>{`
           .pulse-btn { position: relative; }
@@ -115,7 +129,7 @@ function Hero() {
 function SubTagline() {
   return (
     <div
-      aria-label="AI tagline"
+      aria-label="IIT/olympiad tagline"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -127,12 +141,14 @@ function SubTagline() {
         fontSize: 16,
         fontWeight: 700,
         color: THEME.primary,
-        boxShadow: "0 6px 16px rgba(56,130,255,0.15)",
+        boxShadow: "0 6px 16px rgba(56,130,255,0.12)",
         animation: "bounceIn 900ms ease",
       }}
     >
-      <span role="img" aria-hidden>✨</span>
-      <span>Personal AI Tutor for every student — auto-generated practice and clear mastery tracking.</span>
+      <span role="img" aria-hidden>
+        🎯
+      </span>
+      <span>Targeted IIT foundation & Olympiad practice — topic-wise mastery, timed tests, and deep drills.</span>
       <style>{`
         @keyframes bounceIn {
           0% { transform: scale(0.5); opacity: 0; }
@@ -148,18 +164,20 @@ function SubTagline() {
 function RoleQuickStarts() {
   const items = useMemo(
     () => [
-      { emoji: "🏫", label: "School Admin", hint: "Assign teachers • track mastery • trigger remedials", to: "/school" },
-      { emoji: "🧑‍🏫", label: "Teacher", hint: "Edit syllabus • generate practice • notify class", to: "/teacher" },
-      { emoji: "🧑‍🎓", label: "Student", hint: "Self-practice • flashcards • interview prep", to: "/student" },
-      { emoji: "👨‍👩‍👧", label: "Parent", hint: "See progress • get reminders • support learning", to: "/parent" },
+      { emoji: "🏫", label: "School Admin", hint: "Manage foundation tracks • assign cohorts", to: "/school" },
+      { emoji: "👩‍🏫", label: "Coach / Teacher", hint: "Design drills • timed tests • analytics", to: "/teacher" },
+      { emoji: "🧑‍🎓", label: "Student", hint: "Practice topic drills • simulate tests • track mastery", to: "/student" },
+      { emoji: "🏅", label: "Olympiad Candidate", hint: "Olympiad-specific packs & challenge mode", to: "/olympiad" },
     ],
     []
   );
 
   return (
-    <Card title="Quick starts" subtitle="Pick your role to dive in">
+    <Card title="Quick starts" subtitle="Pick your role to dive into IIT & Olympiad prep">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        {items.map((it) => <RoleTile key={it.label} {...it} />)}
+        {items.map((it) => (
+          <RoleTile key={it.label} {...it} />
+        ))}
       </div>
     </Card>
   );
@@ -191,15 +209,29 @@ function RoleTile({ emoji, label, hint, to }) {
 /* --------------------------- Features --------------------------- */
 function FeatureTiles() {
   const items = [
-    { title: "Syllabus-first workflow", text: "Terms → chapters → topics. Generate content per topic, chapter, or full subject." },
-    { title: "Multi-format practice", text: "MCQs for speed, flashcards for recall, interview questions for depth — one click." },
-    { title: "Smart assignments", text: "Send to class or selected students. Attach generated items and due dates, instantly." },
-    { title: "Mastery tracking", text: "Live class dashboards + individual tracks. Spot weak topics quickly." },
+    {
+      title: "Topic-first IIT Prep",
+      text: "Break down concepts into topics → focused drills and cumulative tests.",
+    },
+    {
+      title: "Timed Mock Tests",
+      text: "Full-length and sectional timed simulations to build speed and accuracy.",
+    },
+    {
+      title: "Olympiad Challenge Mode",
+      text: "Curated high-difficulty packs and progressive challenge ladders.",
+    },
+    {
+      title: "Mastery analytics",
+      text: "Per-topic mastery, time-to-solve metrics, and personalized practice queues.",
+    },
   ];
   return (
-    <Card id="features" title="Why schools choose Qboxai" subtitle="Fast to set up • Loved by teachers • Clear for students">
+    <Card id="features" title="Why use Qboxai for IIT & Olympiad" subtitle="Engineered for depth • rhythm • results">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-        {items.map((x, i) => <AnimatedFeatureCard key={i} title={x.title} text={x.text} />)}
+        {items.map((x, i) => (
+          <AnimatedFeatureCard key={i} title={x.title} text={x.text} />
+        ))}
       </div>
     </Card>
   );
@@ -207,16 +239,21 @@ function FeatureTiles() {
 function AnimatedFeatureCard({ title, text }) {
   const ref = useRef(null);
   useEffect(() => {
-    const el = ref.current; if (!el) return;
-    el.style.opacity = 0; el.style.transform = "translateY(20px)";
-    const obs = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        el.style.transition = "all 0.6s ease-out";
-        el.style.opacity = 1;
-        el.style.transform = "translateY(0) scale(1.05)";
-        setTimeout(() => (el.style.transform = "translateY(0) scale(1)"), 600);
-      }
-    }, { threshold: 0.3 });
+    const el = ref.current;
+    if (!el) return;
+    el.style.opacity = 0;
+    el.style.transform = "translateY(20px)";
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.style.transition = "all 0.6s ease-out";
+          el.style.opacity = 1;
+          el.style.transform = "translateY(0) scale(1.05)";
+          setTimeout(() => (el.style.transform = "translateY(0) scale(1)"), 600);
+        }
+      },
+      { threshold: 0.3 }
+    );
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
@@ -245,12 +282,12 @@ function AnimatedFeatureCard({ title, text }) {
 /* ------------------------ How it Works ------------------------ */
 function HowItWorks() {
   return (
-    <Card id="how" title="How Qboxai Works" subtitle="Simple steps to get everyone moving" style={{ padding: 20 }}>
+    <Card id="how" title="How Qboxai Helps IIT & Olympiad Prep" subtitle="Focused steps for consistent improvement" style={{ padding: 20 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        <Step num="1" title="Create your account">Admins create the school. Others join by email or invite link.</Step>
-        <Step num="2" title="Set up classes & syllabus">Add classes & subjects; organize terms, chapters, topics.</Step>
-        <Step num="3" title="Generate & assign">Generate MCQs/flashcards/interview items and assign instantly.</Step>
-        <Step num="4" title="Track & improve">Watch mastery rise. Trigger remedials for weak topics.</Step>
+        <Step num="1" title="Create a cohort">Set up grade-wise cohorts and choose Foundation or Olympiad track.</Step>
+        <Step num="2" title="Map syllabus">Add topics, difficulty tags, and expected mastery targets.</Step>
+        <Step num="3" title="Drill & test">Generate topic drills, timed sections, and full mocks — assign or self-practice.</Step>
+        <Step num="4" title="Analyse & iterate">Auto analytics surface weak topics; prescribe focused remedials.</Step>
       </div>
     </Card>
   );
@@ -259,14 +296,16 @@ function HowItWorks() {
 /* ------------------------------ FAQ ------------------------------ */
 function FAQ() {
   const items = [
-    { q: "Does Qboxai support mixed difficulty sets?", a: "Yes. Choose Easy/Medium/Hard or Mixed when generating content." },
-    { q: "Can I notify parents as well as students?", a: "Absolutely. Notify students, parents, or both — with attachments." },
-    { q: "How do knowledge tracks work?", a: "We aggregate topic mastery from assigned and self-practice sources." },
+    { q: "Can I create olympiad-only packs?", a: "Yes — design packs tagged by level (Junior/Senior/Advanced) and topic." },
+    { q: "Do you support timed sectional tests?", a: "Yes. Create section-wise timers and full mock simulations with auto-grading." },
+    { q: "How does mastery update?", a: "Mastery updates from practice performance, timed test scores and teacher assessments." },
   ];
   return (
     <Card id="faq" title="Frequently asked questions" subtitle="Quick answers">
       <div style={{ display: "grid", gap: 8 }}>
-        {items.map((it, i) => <Accordion key={i} q={it.q} a={it.a} />)}
+        {items.map((it, i) => (
+          <Accordion key={i} q={it.q} a={it.a} />
+        ))}
       </div>
     </Card>
   );
@@ -276,10 +315,18 @@ function Accordion({ q, a }) {
   return (
     <div style={{ background: "#fff", border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 12 }}>
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         style={{
-          width: "100%", textAlign: "left", display: "flex", justifyContent: "space-between",
-          gap: 10, background: "transparent", border: "none", padding: 0, fontWeight: 700, cursor: "pointer",
+          width: "100%",
+          textAlign: "left",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 10,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          fontWeight: 700,
+          cursor: "pointer",
         }}
       >
         <span>{q}</span>
@@ -287,8 +334,12 @@ function Accordion({ q, a }) {
       </button>
       <div
         style={{
-          maxHeight: open ? 200 : 0, overflow: "hidden", transition: "max-height .2s ease",
-          color: THEME.subtext, marginTop: open ? 8 : 0, fontSize: 14,
+          maxHeight: open ? 200 : 0,
+          overflow: "hidden",
+          transition: "max-height .2s ease",
+          color: THEME.subtext,
+          marginTop: open ? 8 : 0,
+          fontSize: 14,
         }}
       >
         {a}
@@ -301,13 +352,17 @@ function Accordion({ q, a }) {
 function BottomCTA() {
   return (
     <Card
-      title="Ready to make your school an AI Tech School?"
-      subtitle="It takes ~2 minutes to get started — invite your team anytime."
-      right={<Tag tone="info">Privacy-minded</Tag>}
+      title="Ready to accelerate IIT Foundation & Olympiad prep?"
+      subtitle="Set up a cohort, push curated drills, and measure results — in minutes."
+      right={<Tag tone="info">Exam-oriented</Tag>}
     >
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <Link to="/signup"><Button>Create a free account</Button></Link>
-        <Link to="/signin"><Button variant="soft">Sign in</Button></Link>
+        <Link to="/signup">
+          <Button>Create a free account</Button>
+        </Link>
+        <Link to="/signin">
+          <Button variant="soft">Sign in</Button>
+        </Link>
       </div>
     </Card>
   );
@@ -359,7 +414,7 @@ function AnimatedBackdrop() {
           position: "absolute",
           inset: 0,
           background:
-            "radial-gradient(1200px 600px at 10% -10%, rgba(56,130,255,0.15) 0%, rgba(56,130,255,0) 60%)",
+            "radial-gradient(1200px 600px at 10% -10%, rgba(90,164,255,0.12) 0%, rgba(90,164,255,0) 60%)",
           zIndex: 0,
         }}
       />
@@ -389,14 +444,30 @@ function AnimatedBackdrop() {
 function GlowRings() {
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-      <div style={{
-        position: "absolute", top: -40, right: -60, width: 260, height: 260, borderRadius: "50%",
-        background: "radial-gradient(closest-side, rgba(90,164,255,.25), rgba(90,164,255,0))", filter: "blur(10px)",
-      }} />
-      <div style={{
-        position: "absolute", bottom: -60, left: -40, width: 300, height: 300, borderRadius: "50%",
-        background: "radial-gradient(closest-side, rgba(43,108,255,.20), rgba(43,108,255,0))", filter: "blur(10px)",
-      }} />
+      <div
+        style={{
+          position: "absolute",
+          top: -40,
+          right: -60,
+          width: 260,
+          height: 260,
+          borderRadius: "50%",
+          background: "radial-gradient(closest-side, rgba(90,164,255,.25), rgba(90,164,255,0))",
+          filter: "blur(10px)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: -60,
+          left: -40,
+          width: 300,
+          height: 300,
+          borderRadius: "50%",
+          background: "radial-gradient(closest-side, rgba(43,108,255,.20), rgba(43,108,255,0))",
+          filter: "blur(10px)",
+        }}
+      />
     </div>
   );
 }

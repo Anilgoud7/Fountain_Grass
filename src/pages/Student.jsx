@@ -22,6 +22,7 @@ function StudentLayout({ data }) {
           <Link to="/student/recommendations"><Button variant="soft">Recommendations</Button></Link>
           <Link to="/student/syllabus"><Button variant="soft">Syllabus</Button></Link>
           <Link to="/student/assigned"><Button variant="soft">Assigned</Button></Link>
+          <Link to="/student/voice"><Button variant="soft">Voice Tutor</Button></Link>
           <div style={{ marginLeft: "auto", width: 240 }}>
             <Select
               value={subjectId}

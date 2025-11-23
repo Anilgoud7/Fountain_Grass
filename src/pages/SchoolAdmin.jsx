@@ -1,5 +1,5 @@
-// /src/pages/SchoolAdmin.jsx — API-free with complete mock school data
-import React, { useEffect, useMemo, useState } from "react";
+// /src/pages/SchoolAdmin.jsx — API-free with complete mock school data + chat timeline + charts
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   THEME,
   Card,
@@ -14,8 +14,19 @@ import {
 } from "../components/ui";
 import { useNavigate } from "react-router-dom";
 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
+
 /** ------------------------------
- *  Complete mock school dataset
+ *  Complete mock school dataset (same as your original)
  *  ------------------------------ */
 const SCHOOL_MOCK = {
   id: "school-1",
@@ -26,9 +37,9 @@ const SCHOOL_MOCK = {
       name: "Class 10 — A",
       teachers: [
         { id: "t1", name: "Alice Johnson" }, // class teacher
-        { id: "t2", name: "Rajesh Singh" },  // Mathematics
-        { id: "t3", name: "Priya Verma" },   // Science
-        { id: "t4", name: "David Chen" },    // English
+        { id: "t2", name: "Rajesh Singh" }, // Mathematics
+        { id: "t3", name: "Priya Verma" }, // Science
+        { id: "t4", name: "David Chen" }, // English
       ],
       students: [
         { id: "s101", name: "Aman Sharma", mastery: 58 },
@@ -205,9 +216,9 @@ const SCHOOL_MOCK = {
       id: "10B",
       name: "Class 10 — B",
       teachers: [
-        { id: "tb1", name: "Meera Iyer" },   // class teacher
-        { id: "tb2", name: "Suresh Rao" },   // Mathematics
-        { id: "tb3", name: "Fatima Khan" },  // Science
+        { id: "tb1", name: "Meera Iyer" }, // class teacher
+        { id: "tb2", name: "Suresh Rao" }, // Mathematics
+        { id: "tb3", name: "Fatima Khan" }, // Science
         { id: "tb4", name: "Oliver Smith" }, // English
       ],
       students: [
@@ -556,6 +567,15 @@ export default function SchoolAdminView({ school = SCHOOL_MOCK }) {
         flashcards: Array.from({ length: Math.max(6, Math.round(count * 1.2)) }, (_, i) => ({ id: `f${i + 1}` })),
         interviews: Array.from({ length: Math.max(3, Math.round(count / 2)) }, (_, i) => ({ id: `i${i + 1}` })),
       });
+
+      // append a chat event (the actual event logic below will be used by charts)
+      appendChatEvent({
+        type: "remedial",
+        title: "Remedial created",
+        text: `Generated remedials (${Math.max(3, Math.round(count))} MCQs, ${Math.max(6, Math.round(count * 1.2))} flashcards).`,
+        ts: new Date().toISOString(),
+        changes: lowTopics.slice(0, 6).map((tid) => ({ target: "topic", id: tid, bump: 5 })),
+      });
     } finally {
       setBusy(false);
     }
@@ -569,15 +589,132 @@ export default function SchoolAdminView({ school = SCHOOL_MOCK }) {
     alert("(Demo) Notification prepared. Wire this action to backend when ready.");
     setPreview({ mcqs: [], flashcards: [], interviews: [] });
     setNote("");
+    appendChatEvent({
+      type: "notify",
+      title: "Teacher notified",
+      text: `Notified teacher ${notifyTeacherId} for remedial action.`,
+      ts: new Date().toISOString(),
+      changes: [],
+    });
   }
 
-  // ---------------- Knowledge tracks ----------------
+  // ---------------- Chat timeline + events ----------------
+  // Seeded demo events that will cause mastery to increase over time
+  const now = Date.now();
+  const [chatEvents, setChatEvents] = useState(() => [
+    {
+      type: "init",
+      title: "Roster imported",
+      text: "Initial import of roster and syllabus.",
+      ts: new Date(now - 1000 * 60 * 60 * 24 * 7).toISOString(),
+      changes: [],
+    },
+    {
+      type: "session",
+      title: "Algebra workshop",
+      text: "Focused practice on Linear Equations & Quadratics.",
+      ts: new Date(now - 1000 * 60 * 60 * 24 * 5).toISOString(),
+      changes: [
+        { target: "topic", id: "m-t1", bump: 5 },
+        { target: "topic", id: "m-t2", bump: 3 },
+        { target: "student", id: "s101", bump: 4 },
+      ],
+    },
+    {
+      type: "practice",
+      title: "Practice set completed",
+      text: "Practice set completed by students — small gains recorded.",
+      ts: new Date(now - 1000 * 60 * 60 * 24 * 4).toISOString(),
+      changes: [
+        { target: "topic", id: "m-t1", bump: 4 },
+        { target: "topic", id: "m-t4", bump: 6 },
+        { target: "student", id: "s105", bump: 6 },
+      ],
+    },
+    {
+      type: "revision",
+      title: "Quick revision",
+      text: "Short revision session improved a few topics.",
+      ts: new Date(now - 1000 * 60 * 60 * 24 * 2).toISOString(),
+      changes: [
+        { target: "topic", id: "m-t1", bump: 3 },
+        { target: "topic", id: "m-t8", bump: 2 },
+      ],
+    },
+    {
+      type: "assessment",
+      title: "Mini assessment",
+      text: "Students took a mini-assessment; results applied.",
+      ts: new Date(now - 1000 * 60 * 60 * 24 * 1).toISOString(),
+      changes: [
+        { target: "student", id: "s101", bump: 2 },
+        { target: "topic", id: "m-t4", bump: 1 },
+      ],
+    },
+  ]);
+
+  // helper to append events
+  function appendChatEvent(ev) {
+    setChatEvents((s) => [...s, ev]);
+  }
+
+  // ---------------- Apply events to in-memory copies so UI and KPIs reflect the applied events ----------------
+  // We'll reconstruct students + syllabus by applying events in order when needed.
+  function applyEventsUpTo(count) {
+    // base students for the class
+    const baseStudents = (school?.classes || []).find((c) => c.id === classId)?.students || [];
+    // deep clone students
+    const updatedStudents = baseStudents.map((s) => ({ ...s }));
+
+    // base syllabus for the subject
+    const baseSyllabus =
+      (school?.classes || [])
+        .find((c) => c.id === classId)
+        ?.subjects?.find((s) => s.id === subjectId)?.syllabus || [];
+    const updatedSyllabus = baseSyllabus.map((t) => ({
+      ...t,
+      chapters: t.chapters.map((ch) => ({ ...ch, topics: ch.topics.map((tp) => ({ ...tp })) })),
+    }));
+
+    for (let i = 0; i < count && i < chatEvents.length; i++) {
+      const ev = chatEvents[i];
+      for (const chg of ev.changes || []) {
+        if (chg.target === "student") {
+          const idx = updatedStudents.findIndex((x) => x.id === chg.id);
+          if (idx >= 0) updatedStudents[idx].mastery = Math.min(100, (updatedStudents[idx].mastery || 0) + (chg.bump || 0));
+        }
+        if (chg.target === "topic") {
+          for (const term of updatedSyllabus) {
+            for (const ch of term.chapters) {
+              for (const tp of ch.topics) {
+                if (tp.id === chg.id) tp.mastery = Math.min(100, (tp.mastery || 0) + (chg.bump || 0));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    setStudentsByClass((m) => ({ ...m, [classId]: updatedStudents }));
+    setSyllabusBySubject((m) => ({ ...m, [subjectId]: updatedSyllabus }));
+  }
+
+  // Apply all events by default when class/subject changes
+  useEffect(() => {
+    // ensure roster & syllabus loaded
+    loadRoster(classId);
+    loadSyllabus(classId, subjectId);
+    // apply all events
+    applyEventsUpTo(chatEvents.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, subjectId, JSON.stringify(chatEvents)]);
+
+  // ---------------- Knowledge tracks (derived from current applied syllabus/students) ----------------
   const bySubject = useMemo(() => {
     const list = (subjects || []).map((s) => {
       const terms = syllabusBySubject[s.id] || [];
       const topics = terms.flatMap((t) => t.chapters).flatMap((c) => c.topics || []);
-      const avg =
-        Math.round((topics.reduce((a, t) => a + (t.mastery || 0), 0) / (topics.length || 1)) || 0);
+      const avg = Math.round((topics.reduce((a, t) => a + (t.mastery || 0), 0) / (topics.length || 1)) || 0);
       return { id: s.id, name: s.name, mastery: avg };
     });
     return list;
@@ -598,6 +735,113 @@ export default function SchoolAdminView({ school = SCHOOL_MOCK }) {
     return tps.filter((t) => (t.mastery || 0) < 60).slice(0, 8);
   }, [subjectId, syllabusBySubject]);
 
+  // ---------------- Build chart series from events ----------------
+  // Class average series (initial + after each event)
+  const classSeries = useMemo(() => {
+    const series = [];
+    const baseStudents = (school?.classes || []).find((c) => c.id === classId)?.students || [];
+    let curStudents = baseStudents.map((s) => ({ ...s }));
+    // initial point (before first event) at earliest event - 1 day
+    const initTime = chatEvents[0] ? new Date(chatEvents[0].ts).getTime() - 1000 * 60 * 60 * 24 : Date.now();
+    const pushPoint = (time, studentsArr) => {
+      const avg = Math.round((studentsArr.reduce((a, s) => a + (s.mastery || 0), 0) / (studentsArr.length || 1)) || 0);
+      series.push({ time: new Date(time).toLocaleDateString(), avg });
+    };
+    pushPoint(initTime, curStudents);
+
+    for (let i = 0; i < chatEvents.length; i++) {
+      const ev = chatEvents[i];
+      for (const chg of ev.changes || []) {
+        if (chg.target === "student") {
+          const idx = curStudents.findIndex((x) => x.id === chg.id);
+          if (idx >= 0) curStudents[idx].mastery = Math.min(100, (curStudents[idx].mastery || 0) + (chg.bump || 0));
+        }
+      }
+      pushPoint(ev.ts, curStudents);
+    }
+    return series;
+  }, [chatEvents, classId, school]);
+
+  // Topic series for a selected topic
+  const [topicToChart, setTopicToChart] = useState("m-t1");
+  const topicSeries = useMemo(() => {
+    const series = [];
+    const baseSyllabus = (school?.classes || []).find((c) => c.id === classId)?.subjects?.find((s) => s.id === subjectId)?.syllabus || [];
+    const findTopicInitial = (sy) => {
+      for (const term of sy) {
+        for (const ch of term.chapters) {
+          for (const tp of ch.topics) {
+            if (tp.id === topicToChart) return tp.mastery || 0;
+          }
+        }
+      }
+      return null;
+    };
+    let curVal = findTopicInitial(baseSyllabus) ?? 0;
+    const initTime = chatEvents[0] ? new Date(chatEvents[0].ts).getTime() - 1000 * 60 * 60 * 24 : Date.now();
+    series.push({ time: new Date(initTime).toLocaleDateString(), value: curVal });
+
+    for (let i = 0; i < chatEvents.length; i++) {
+      const ev = chatEvents[i];
+      for (const chg of ev.changes || []) {
+        if (chg.target === "topic" && chg.id === topicToChart) {
+          curVal = Math.min(100, curVal + (chg.bump || 0));
+        }
+      }
+      series.push({ time: new Date(ev.ts).toLocaleDateString(), value: curVal });
+    }
+    return series;
+  }, [chatEvents, topicToChart, classId, subjectId, school]);
+
+  // ---------------- Chat UI ----------------
+  function ChatTimeline({ events }) {
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        {events.map((ev, i) => (
+          <div
+            key={i}
+            style={{
+              padding: 10,
+              borderRadius: 10,
+              background: "#fff",
+              border: `1px solid ${THEME.border}`,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontWeight: 700 }}>{ev.title}</div>
+              <div style={{ fontSize: 12, color: THEME.subtext }}>{new Date(ev.ts).toLocaleString()}</div>
+            </div>
+            <div style={{ marginTop: 6 }}>{ev.text}</div>
+            {ev.changes && ev.changes.length ? (
+              <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {ev.changes.map((c, idx) => (
+                  <Tag key={idx} tone={c.bump > 0 ? "info" : "warn"}>
+                    {c.target} {c.id} {c.bump > 0 ? `+${c.bump}` : c.bump}
+                  </Tag>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Quick helper to add a manual practice event (topic bump)
+  function addTopicBump(topicId, bump = 5) {
+    if (!topicId) return alert("Pick a topic");
+    const ev = {
+      type: "manual",
+      title: "Manual practice",
+      text: `Manual practice: ${topicId} +${bump}`,
+      ts: new Date().toISOString(),
+      changes: [{ target: "topic", id: topicId, bump }],
+    };
+    appendChatEvent(ev);
+    // Also immediately apply all events so charts update
+    applyEventsUpTo(chatEvents.length + 1);
+  }
+
   return (
     <div style={{ background: THEME.bg, color: THEME.text, padding: 16, display: "grid", gap: 16 }}>
       {/* Header with branding */}
@@ -605,7 +849,7 @@ export default function SchoolAdminView({ school = SCHOOL_MOCK }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Logo />
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Button variant="soft" onClick={loadClasses} disabled={loading}>
+            <Button variant="soft" onClick={() => loadClasses()} disabled={loading}>
               {loading ? "Refreshing…" : "Refresh Data"}
             </Button>
             <Button variant="soft" onClick={() => navigate("/teacher")}>
@@ -620,27 +864,15 @@ export default function SchoolAdminView({ school = SCHOOL_MOCK }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Class</div>
-            <Select
-              value={classId}
-              onChange={setClassId}
-              options={classes.map((c) => ({ label: c.name, value: c.id }))}
-            />
+            <Select value={classId} onChange={setClassId} options={classes.map((c) => ({ label: c.name, value: c.id }))} />
           </div>
           <div>
             <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Subject</div>
-            <Select
-              value={subjectId}
-              onChange={setSubjectId}
-              options={(subjects || []).map((s) => ({ label: s.name, value: s.id }))}
-            />
+            <Select value={subjectId} onChange={setSubjectId} options={(subjects || []).map((s) => ({ label: s.name, value: s.id }))} />
           </div>
           <div>
             <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Class Teacher</div>
-            <Select
-              value={classTeacherId}
-              onChange={setClassTeacherId}
-              options={(teachers || []).map((t) => ({ label: t.name, value: t.id }))}
-            />
+            <Select value={classTeacherId} onChange={setClassTeacherId} options={(teachers || []).map((t) => ({ label: t.name, value: t.id }))} />
           </div>
         </div>
 
@@ -686,231 +918,157 @@ export default function SchoolAdminView({ school = SCHOOL_MOCK }) {
         </div>
       </Card>
 
-      {/* KPIs */}
-      <Card title="Class KPIs" subtitle="Holistic view">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: THEME.subtext }}>Class Average Mastery</div>
-            <Progress value={classAvg} />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: THEME.subtext }}>Students at Risk (&lt;60%)</div>
-            <div style={{ fontWeight: 700 }}>{atRisk}</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Holistic track (by subject) */}
-      <Card title="Holistic Knowledge Track" subtitle="Average mastery by subject">
-        <div style={{ display: "grid", gap: 10 }}>
-          {bySubject.map((s) => (
-            <div
-              key={s.id}
-              style={{ display: "grid", gridTemplateColumns: "180px 1fr 60px", gap: 12, alignItems: "center" }}
-            >
-              <div style={{ fontWeight: 600 }}>{s.name}</div>
-              <Progress value={s.mastery} />
-              <div style={{ textAlign: "right", fontWeight: 700 }}>{s.mastery}%</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Individual track */}
-      <Card title="Individual Knowledge Track" subtitle="Pick a student • see progress & weak topics">
+      {/* Two-column layout: left = KPIs & charts, right = chat + composer */}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
         <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ width: 280 }}>
-            <Select
-              value={studentId}
-              onChange={setStudentId}
-              options={(students || []).map((s) => ({ label: s.name, value: s.id }))}
-            />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16 }}>
-            <div>
-              <SectionTitle>Subject Progress</SectionTitle>
-              <div style={{ display: "grid", gap: 8 }}>
-                {bySubject.map((s) => (
-                  <div
-                    key={s.id}
-                    style={{ display: "grid", gridTemplateColumns: "160px 1fr 60px", gap: 12, alignItems: "center" }}
-                  >
-                    <div style={{ color: THEME.subtext }}>{s.name}</div>
-                    <Progress value={Math.max(0, Math.min(100, Math.round(stu?.mastery ?? s.mastery)))} />
-                    <div style={{ textAlign: "right" }}>
-                      <Tag tone={(stu?.mastery ?? s.mastery) < 60 ? "warn" : "info"}>
-                        {Math.round(stu?.mastery ?? s.mastery)}%
-                      </Tag>
-                    </div>
-                  </div>
-                ))}
+          {/* KPIs */}
+          <Card title="Class KPIs" subtitle="Holistic view">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, color: THEME.subtext }}>Class Average Mastery</div>
+                <Progress value={classAvg} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: THEME.subtext }}>Students at Risk (&lt;60%)</div>
+                <div style={{ fontWeight: 700 }}>{atRisk}</div>
               </div>
             </div>
-            <div>
-              <SectionTitle>Weak Topics (sample)</SectionTitle>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {studentWeakTopics.length ? (
-                  studentWeakTopics.map((t) => (
-                    <Tag key={t.id} tone="warn">
-                      {t.name}
-                    </Tag>
-                  ))
-                ) : (
-                  <div style={{ color: THEME.subtext }}>No weak topics detected.</div>
-                )}
+          </Card>
+
+          {/* Charts */}
+          <Card title="Knowledge over time" subtitle="Class average & topic trend">
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ height: 220 }}>
+                <SectionTitle>Class average — over time</SectionTitle>
+                <ResponsiveContainer width="100%" height={150}>
+                  <LineChart data={classSeries}>
+                    <CartesianGrid />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="avg" stroke="#4f46e5" strokeWidth={2} dot />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-            </div>
-          </div>
-        </div>
-      </Card>
 
-      {/* Remedial builder — notify teacher (demo only) */}
-      <Card title="Remedial Builder" subtitle="Generate practice & notify a teacher to act">
-        <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Difficulty</div>
-              <RadioRow
-                value={difficulty}
-                onChange={setDifficulty}
-                items={[
-                  { label: "Easy", value: "Easy" },
-                  { label: "Medium", value: "Medium" },
-                  { label: "Hard", value: "Hard" },
-                  { label: "Mixed", value: "Mixed" },
-                ]}
-              />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Count per set</div>
-              <Input type="number" value={count} onChange={(v) => setCount(Number(v) || 0)} />
-            </div>
-            <div>
-              <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Teacher to Notify</div>
-              <Select
-                value={notifyTeacherId}
-                onChange={setNotifyTeacherId}
-                options={(teachers || []).map((t) => ({ label: t.name, value: t.id }))}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Target</div>
-              <RadioRow
-                value={targetType}
-                onChange={setTargetType}
-                items={[
-                  { label: "Whole Class", value: "class" },
-                  { label: "Specific Student", value: "student" },
-                ]}
-              />
-              {targetType === "student" && (
-                <>
-                  <Divider />
-                  <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Student</div>
+              <div style={{ height: 220 }}>
+                <SectionTitle style={{ marginBottom: 6 }}>Topic trend</SectionTitle>
+                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
                   <Select
-                    value={targetStudentId}
-                    onChange={setTargetStudentId}
-                    options={(students || []).map((s) => ({ label: s.name, value: s.id }))}
+                    value={topicToChart}
+                    onChange={setTopicToChart}
+                    options={
+                      (syllabusBySubject[subjectId] || [])
+                        .flatMap((t) => t.chapters.flatMap((c) => c.topics.map((tp) => ({ label: tp.name, value: tp.id }))))
+                        .concat([{ label: "— pick —", value: "" }])
+                    }
                   />
-                </>
-              )}
+                  <Button variant="soft" onClick={() => applyEventsUpTo(chatEvents.length)}>
+                    Apply All Events
+                  </Button>
+                </div>
+                <ResponsiveContainer width="100%" height={140}>
+                  <LineChart data={topicSeries}>
+                    <CartesianGrid />
+                    <XAxis dataKey="time" />
+                    <YAxis domain={[0, 100]} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="value" stroke="#059669" strokeWidth={2} dot />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 12, color: THEME.subtext, marginBottom: 6 }}>Note to Teacher</div>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Add instructions or context for the teacher…"
-                rows={4}
-                style={{
-                  width: "100%",
-                  border: `1px solid ${THEME.border}`,
-                  borderRadius: 12,
-                  padding: 12,
-                  outline: "none",
-                }}
-              />
-            </div>
-          </div>
+          </Card>
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button variant="soft" onClick={computeLowTopics}>
-              Pick Low Topics
-            </Button>
-            <Button onClick={generateRemedials} disabled={busy || !lowTopics.length}>
-              Generate
-            </Button>
-            <Button variant="soft" onClick={notifyTeacher} disabled={busy}>
-              Notify Teacher
-            </Button>
-          </div>
-
-          <Divider />
-          <div>
-            <SectionTitle>Preview</SectionTitle>
-            {!preview.mcqs.length && !preview.flashcards.length && !preview.interviews.length ? (
-              <div style={{ color: THEME.subtext }}>Pick low-mastery topics then Generate.</div>
+          {/* Syllabus snapshot */}
+          <Card title="Syllabus (read-only snapshot)">
+            {(syllabusBySubject[subjectId] || []).length ? (
+              (syllabusBySubject[subjectId] || []).map((term) => (
+                <div
+                  key={term.id}
+                  style={{
+                    padding: 8,
+                    marginBottom: 8,
+                    background: "#fff",
+                    border: `1px solid ${THEME.border}`,
+                    borderRadius: 10,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>{term.name}</div>
+                  {term.chapters.map((ch) => (
+                    <div key={ch.id} style={{ marginBottom: 6 }}>
+                      <div style={{ fontWeight: 600 }}>{ch.name}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {ch.topics.map((tp) => (
+                          <Tag key={tp.id} tone={(tp.mastery || 0) < 60 ? "warn" : "info"}>
+                            {tp.name}
+                          </Tag>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))
             ) : (
-              <div style={{ display: "grid", gap: 8 }}>
-                {!!preview.mcqs.length && (
-                  <div>
-                    <strong>MCQs:</strong> {preview.mcqs.length}
-                  </div>
-                )}
-                {!!preview.flashcards.length && (
-                  <div>
-                    <strong>Flashcards:</strong> {preview.flashcards.length}
-                  </div>
-                )}
-                {!!preview.interviews.length && (
-                  <div>
-                    <strong>Interview Qs:</strong> {preview.interviews.length}
-                  </div>
-                )}
+              <div style={{ color: THEME.subtext }}>
+                No syllabus loaded yet. Ensure the Teacher workspace created topics, or embed syllabus in the `school` prop.
               </div>
             )}
-          </div>
+          </Card>
         </div>
-      </Card>
 
-      {/* Syllabus snapshot */}
-      <Card title="Syllabus (read-only snapshot)">
-        {(syllabusBySubject[subjectId] || []).length ? (
-          (syllabusBySubject[subjectId] || []).map((term) => (
-            <div
-              key={term.id}
-              style={{
-                padding: 8,
-                marginBottom: 8,
-                background: "#fff",
-                border: `1px solid ${THEME.border}`,
-                borderRadius: 10,
-              }}
-            >
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>{term.name}</div>
-              {term.chapters.map((ch) => (
-                <div key={ch.id} style={{ marginBottom: 6 }}>
-                  <div style={{ fontWeight: 600 }}>{ch.name}</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {ch.topics.map((tp) => (
-                      <Tag key={tp.id} tone={(tp.mastery || 0) < 60 ? "warn" : "info"}>
-                        {tp.name}
-                      </Tag>
-                    ))}
-                  </div>
-                </div>
-              ))}
+        <div style={{ display: "grid", gap: 12 }}>
+          {/* Chat timeline */}
+          <Card title="Activity Chat" subtitle="Timeline of knowledge events">
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button variant="soft" onClick={() => applyEventsUpTo(0)}>
+                  Reset Applied
+                </Button>
+                <Button onClick={() => applyEventsUpTo(chatEvents.length)}>Apply All</Button>
+                <div style={{ marginLeft: "auto", color: THEME.subtext }}>{chatEvents.length} events</div>
+              </div>
+              <div style={{ maxHeight: 520, overflow: "auto" }}>
+                <ChatTimeline events={chatEvents} />
+              </div>
             </div>
-          ))
-        ) : (
-          <div style={{ color: THEME.subtext }}>
-            No syllabus loaded yet. Ensure the Teacher workspace created topics, or embed syllabus in the `school` prop.
-          </div>
-        )}
-      </Card>
+          </Card>
+
+          {/* Quick composer */}
+          <Card title="Compose quick event" subtitle="Simulate a practice bump">
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ fontSize: 12, color: THEME.subtext }}>Pick a topic (current subject) and add +5 mastery</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Select
+                  value={topicToChart}
+                  onChange={setTopicToChart}
+                  options={
+                    (syllabusBySubject[subjectId] || [])
+                      .flatMap((t) => t.chapters.flatMap((c) => c.topics.map((tp) => ({ label: tp.name, value: tp.id }))))
+                      .concat([{ label: "— pick —", value: "" }])
+                  }
+                />
+                <Button variant="soft" onClick={() => addTopicBump(topicToChart, 5)}>
+                  Add +5
+                </Button>
+              </div>
+
+              <Divider />
+
+              <div style={{ fontSize: 12, color: THEME.subtext }}>Generate remedial (demo)</div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button variant="soft" onClick={computeLowTopics}>
+                  Pick Low Topics
+                </Button>
+                <Button onClick={generateRemedials} disabled={busy || !lowTopics.length}>
+                  Generate Remedials
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
