@@ -17,6 +17,7 @@ import SelfAssess from "./pages/SelfAssess";
 import Recommendations from "./pages/Recommendations";
 import Syllabus from "./pages/Syllabus";
 import Assigned from "./pages/Assigned";
+import AITutor from "./pages/AITutor";
 
 const FONT_STACK =
   'Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif';
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="recommendations" element={<Recommendations />} />
           <Route path="syllabus" element={<Syllabus />} />
           <Route path="assigned" element={<Assigned />} />
+          <Route path="ai-tutor" element={<AITutor />} />
         </Route>
 
         {/* Fallback */}

@@ -14,21 +14,42 @@ function StudentLayout({ data }) {
   );
 
   return (
-    <div style={{ background: THEME.bg, color: THEME.text, padding: 16, display: "grid", gap: 16 }}>
-      <Card title={`Welcome, ${student?.user?.name || "Student"}`} >
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <Link to="/student/Dashboard"><Button variant="soft">Dashboard</Button></Link>  
-          <Link to="/student/self-assess"><Button variant="soft">Self Assess</Button></Link>
-          <Link to="/student/recommendations"><Button variant="soft">Recommendations</Button></Link>
-          <Link to="/student/syllabus"><Button variant="soft">Syllabus</Button></Link>
-          <Link to="/student/assigned"><Button variant="soft">Assigned</Button></Link>
-          <div style={{ marginLeft: "auto", width: 240 }}>
-            <Select
-              value={subjectId}
-              onChange={setSubjectId}
-              options={subjects.map((s) => ({ label: s.name, value: s.id }))}
-            />
-          </div>
+    <div
+      style={{
+        background: THEME.bg,
+        color: THEME.text,
+        padding: 16,
+        display: "grid",
+        gap: 16,
+      }}
+    >
+      <Card title={`Welcome, ${student?.user?.name || "Student"}`}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <Link to="/student/Dashboard">
+            <Button variant="soft">Dashboard</Button>
+          </Link>
+          <Link to="/student/self-assess">
+            <Button variant="soft">Self Assess</Button>
+          </Link>
+          <Link to="/student/recommendations">
+            <Button variant="soft">Recommendations</Button>
+          </Link>
+          <Link to="/student/syllabus">
+            <Button variant="soft">Syllabus</Button>
+          </Link>
+          <Link to="/student/assigned">
+            <Button variant="soft">Assigned</Button>
+          </Link>
+          <Link to="/student/ai-tutor">
+            <Button variant="soft">AI Tutor</Button>
+          </Link>
         </div>
       </Card>
 
@@ -38,4 +59,4 @@ function StudentLayout({ data }) {
   );
 }
 
-export default StudentLayout;  // <-- IMPORTANT
+export default StudentLayout; // <-- IMPORTANT
