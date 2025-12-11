@@ -14,7 +14,7 @@ export async function startAudioPlayerWorklet() {
     console.log("AudioContext resumed");
   }
 
-  // 2. Create the processor code inline as a Blob
+  // 2. Use inline processor (since external file loading might fail)
   const processorCode = `
     class PCMPlayerProcessor extends AudioWorkletProcessor {
       constructor() {
@@ -120,4 +120,43 @@ export async function startAudioPlayerWorklet() {
   console.log("Sample rate:", audioContext.sampleRate);
 
   return [audioPlayerNode, audioContext];
+}
+
+/**
+ * Test speaker by playing a 440Hz beep for 1 second
+ */
+export async function testSpeaker() {
+  const audioContext = new AudioContext();
+
+  // Resume context if suspended
+  if (audioContext.state === "suspended") {
+    await audioContext.resume();
+  }
+
+  // Create oscillator (sine wave at 440Hz - A note)
+  const oscillator = audioContext.createOscillator();
+  const gainNode = audioContext.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+
+  // Set volume
+  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+
+  // Connect: oscillator -> gain -> destination
+  oscillator.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  // Play for 1 second
+  oscillator.start();
+  oscillator.stop(audioContext.currentTime + 1);
+
+  // Cleanup
+  oscillator.onended = () => {
+    oscillator.disconnect();
+    gainNode.disconnect();
+    audioContext.close();
+  };
+
+  return true;
 }

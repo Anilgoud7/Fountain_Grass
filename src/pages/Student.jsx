@@ -1,7 +1,7 @@
 // src/pages/Student.jsx
 import React, { useMemo, useState } from "react";
-import { Link, Outlet } from "react-router-dom";
-import { THEME, Card, Button, Select, Tag } from "../components/ui";
+import { NavLink, Outlet } from "react-router-dom";
+import { Card, Button } from "../components/ui";
 import { studentData } from "/src/data/studentData.js";
 
 function StudentLayout({ data }) {
@@ -13,43 +13,34 @@ function StudentLayout({ data }) {
     [subjects, subjectId]
   );
 
+  const navLinks = [
+    { to: "/student/Dashboard", label: "Dashboard" },
+    { to: "/student/self-assess", label: "Self Assess" },
+    { to: "/student/recommendations", label: "Recommendations" },
+    { to: "/student/syllabus", label: "Syllabus" },
+    { to: "/student/assigned", label: "Assigned" },
+    { to: "/student/ai-tutor", label: "AI Tutor" },
+  ];
+
   return (
-    <div
-      style={{
-        background: THEME.bg,
-        color: THEME.text,
-        padding: 16,
-        display: "grid",
-        gap: 16,
-      }}
-    >
+    <div className="bg-gray-50 text-gray-900 p-4 grid gap-4">
       <Card title={`Welcome, ${student?.user?.name || "Student"}`}>
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <Link to="/student/Dashboard">
-            <Button variant="soft">Dashboard</Button>
-          </Link>
-          <Link to="/student/self-assess">
-            <Button variant="soft">Self Assess</Button>
-          </Link>
-          <Link to="/student/recommendations">
-            <Button variant="soft">Recommendations</Button>
-          </Link>
-          <Link to="/student/syllabus">
-            <Button variant="soft">Syllabus</Button>
-          </Link>
-          <Link to="/student/assigned">
-            <Button variant="soft">Assigned</Button>
-          </Link>
-          <Link to="/student/ai-tutor">
-            <Button variant="soft">AI Tutor</Button>
-          </Link>
+        <div className="flex gap-2 flex-wrap items-center">
+          {navLinks.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className={({ isActive }) =>
+                `px-4 py-2 rounded-lg font-medium transition-all ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
         </div>
       </Card>
 
@@ -59,4 +50,4 @@ function StudentLayout({ data }) {
   );
 }
 
-export default StudentLayout; // <-- IMPORTANT
+export default StudentLayout;
