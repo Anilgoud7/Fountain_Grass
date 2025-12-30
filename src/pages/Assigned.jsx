@@ -26,11 +26,23 @@ const generateSessionId = () => {
 };
 
 // Quiz display component
-function QuizDisplay({ data, mode, onClose }) {
+function QuizDisplay({
+  data,
+  mode,
+  onClose,
+  sessionId,
+  selectedClass,
+  selectedSubject,
+  selectedChapter,
+  selectedTopic,
+  selectedDifficulty,
+  selectedQuestionCount,
+}) {
   const [userAnswers, setUserAnswers] = React.useState({});
   const [showResults, setShowResults] = React.useState(false);
-  const [score, setScore] = React.useState(0);
+  const [resultData, setResultData] = React.useState(null);
   const [flippedCards, setFlippedCards] = React.useState({});
+  const [analysisLoading, setAnalysisLoading] = React.useState(false);
 
   const handleAnswerSelect = (questionIndex, answer) => {
     setUserAnswers((prev) => ({
@@ -46,17 +58,65 @@ function QuizDisplay({ data, mode, onClose }) {
     }));
   };
 
-  const handleSubmit = () => {
-    let correctCount = 0;
-    data.forEach((q, index) => {
-      // Handle both quiz and flashcard formats
-      const correctAnswer = q.answer || q.correct_answer;
-      if (userAnswers[index]?.toLowerCase() === correctAnswer.toLowerCase()) {
-        correctCount++;
+  const handleSubmit = async () => {
+    setAnalysisLoading(true);
+
+    try {
+      // Step 1: Prepare user response data
+      const userResponse = data.map((question, index) => ({
+        question: question.question || question.front,
+        user_answer: userAnswers[index] || "",
+        options: question.options || null,
+        topic: question.topic,
+        concept: question.concept,
+        difficulty: question.difficulty,
+      }));
+
+      // Step 2: Call analysis API
+      const analysisParams = new URLSearchParams({
+        session_type: mode,
+        user_response: JSON.stringify(userResponse),
+      });
+
+      const analysisUrl = `${API_BASE_URL}/api/analyse_text/${sessionId}?${analysisParams.toString()}`;
+      console.log("Calling analysis API:", analysisUrl);
+
+      const analysisResponse = await fetch(analysisUrl, {
+        method: "GET",
+      });
+
+      if (!analysisResponse.ok) {
+        throw new Error(`Analysis API Error: ${analysisResponse.status}`);
       }
-    });
-    setScore(Math.round((correctCount / data.length) * 100));
-    setShowResults(true);
+
+      const analysisResult = await analysisResponse.json();
+      console.log("Analysis result:", analysisResult);
+
+      // Step 3: Fetch results from get result API
+      const resultUrl = `${API_BASE_URL}/result/${sessionId}`;
+      console.log("Fetching results:", resultUrl);
+
+      const resultResponse = await fetch(resultUrl);
+
+      if (!resultResponse.ok) {
+        throw new Error(`Result API Error: ${resultResponse.status}`);
+      }
+
+      const resultJson = await resultResponse.json();
+      console.log("Result data:", resultJson);
+
+      // Handle result data - could be array or single object
+      const results = Array.isArray(resultJson) ? resultJson : [resultJson];
+      setResultData(results);
+      setShowResults(true);
+    } catch (error) {
+      console.error("Error in analysis/result:", error);
+      alert(
+        `Error: ${error.message}\n\nPlease check if backend API is running.`
+      );
+    } finally {
+      setAnalysisLoading(false);
+    }
   };
 
   // Check if this is flashcard or quiz format
@@ -82,122 +142,234 @@ function QuizDisplay({ data, mode, onClose }) {
           </div>
 
           {/* Show Results */}
-          {showResults ? (
+          {showResults && resultData ? (
             <div className="space-y-6">
-              {/* Score Card */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-lg border-2 border-indigo-200 text-center mb-8">
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                  Your Score
-                </h3>
-                <p className="text-5xl font-bold text-indigo-600">{score}%</p>
-                <p className="text-gray-600 mt-2">
-                  You got{" "}
-                  {
-                    Object.values(userAnswers).filter((ans, idx) => {
-                      const correctAnswer =
-                        data[idx]?.answer || data[idx]?.correct_answer;
-                      return ans.toLowerCase() === correctAnswer.toLowerCase();
-                    }).length
-                  }{" "}
-                  out of {data.length} correct
-                </p>
-              </div>
-
-              {/* Answer Review */}
-              {data.map((question, index) => {
-                const userAnswer = userAnswers[index];
-                const correctAnswer =
-                  question.answer || question.correct_answer;
-                const isCorrect =
-                  userAnswer?.toLowerCase() === correctAnswer.toLowerCase();
+              {resultData.map((result, index) => {
+                const isQuiz = result.quiz !== undefined;
+                const isFlashcard = result.flashcard !== undefined;
 
                 return (
-                  <div
-                    key={index}
-                    className={`p-5 rounded-lg border-l-4 ${
-                      isCorrect
-                        ? "bg-green-50 border-green-500"
-                        : "bg-red-50 border-red-500"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <h4 className="font-semibold text-gray-900 text-lg flex-1">
-                        Q{index + 1}. {question.question || question.front}
-                      </h4>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ml-3 flex-shrink-0 flex items-center gap-1 ${
-                          isCorrect
-                            ? "bg-green-200 text-green-800"
-                            : "bg-red-200 text-red-800"
-                        }`}
-                      >
-                        {isCorrect ? (
-                          <>
-                            <FaCheck /> Correct
-                          </>
-                        ) : (
-                          <>
-                            <FaTimes /> Wrong
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-600 mb-3 flex items-center gap-4">
-                      <span className="flex items-center gap-1">
-                        <FaBook className="text-blue-600" /> {question.topic}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <FaBullseye className="text-indigo-600" />{" "}
-                        {question.concept}
-                      </span>
+                  <div key={index} className="space-y-6">
+                    {/* Session Info */}
+                    <div className="bg-white rounded-lg p-4 shadow-sm border-2 border-gray-200">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500 uppercase font-semibold">
+                            User
+                          </span>
+                          <span className="text-sm font-bold text-gray-800 mt-1">
+                            {users[result.user_id] || result.user_id}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500 uppercase font-semibold">
+                            Subject
+                          </span>
+                          <span className="text-sm font-bold text-gray-800 mt-1 capitalize">
+                            {result.subject}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500 uppercase font-semibold">
+                            Topic
+                          </span>
+                          <span className="text-sm font-bold text-gray-800 mt-1">
+                            {result.topic}
+                          </span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs text-gray-500 uppercase font-semibold">
+                            Date
+                          </span>
+                          <span className="text-sm font-bold text-gray-800 mt-1">
+                            {new Date(result.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Quiz Format */}
-                    {question.options ? (
-                      <div className="space-y-2 mb-3">
-                        {Object.entries(question.options).map(
-                          ([key, value]) => (
+                    {/* Quiz Results */}
+                    {isQuiz && result.quiz && (
+                      <div className="space-y-4">
+                        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
+                          🎯 Quiz Performance
+                        </h3>
+
+                        {/* Score Progress Bar */}
+                        <div className="bg-white rounded-lg p-6 shadow-sm">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-sm font-semibold text-gray-600">
+                              Overall Score
+                            </span>
+                            <span className="text-2xl font-bold text-blue-600">
+                              {result.quiz.correctly_answered}/
+                              {result.quiz.total_questions}
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                             <div
-                              key={key}
-                              className={`p-3 rounded border-2 text-sm ${
-                                key === correctAnswer
-                                  ? "bg-green-100 border-green-500 font-semibold"
-                                  : key === userAnswer && !isCorrect
-                                  ? "bg-red-100 border-red-500 font-semibold"
-                                  : "bg-gray-50 border-gray-200"
-                              }`}
-                            >
-                              <span className="font-bold">
-                                {key.toUpperCase()}.
-                              </span>{" "}
-                              {value}
+                              className="bg-gradient-to-r from-green-400 to-blue-500 h-4 rounded-full transition-all duration-500"
+                              style={{
+                                width: `${
+                                  (result.quiz.correctly_answered /
+                                    result.quiz.total_questions) *
+                                  100
+                                }%`,
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {Math.round(
+                              (result.quiz.correctly_answered /
+                                result.quiz.total_questions) *
+                                100
+                            )}
+                            % Correct
+                          </p>
+                        </div>
+
+                        {/* Correct/Wrong Stats */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                            <div className="text-green-600 text-3xl mb-2">
+                              ✓
                             </div>
-                          )
-                        )}
-                      </div>
-                    ) : (
-                      /* Flashcard Format */
-                      <div className="bg-blue-50 p-4 rounded border-l-2 border-blue-500 mb-3">
-                        <p className="text-sm font-semibold text-blue-900 mb-2">
-                          Answer:
-                        </p>
-                        <p className="text-sm text-blue-800 font-medium">
-                          {question.back || question.correct_answer}
-                        </p>
-                        <p className="text-sm text-blue-700 mt-2">
-                          Your answer: <strong>{userAnswer}</strong>
-                        </p>
+                            <div className="text-2xl font-bold text-green-700">
+                              {result.quiz.correctly_answered}
+                            </div>
+                            <div className="text-sm text-green-600">
+                              Correct Answers
+                            </div>
+                          </div>
+                          <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4">
+                            <div className="text-red-600 text-3xl mb-2">✗</div>
+                            <div className="text-2xl font-bold text-red-700">
+                              {result.quiz.wrongly_answered}
+                            </div>
+                            <div className="text-sm text-red-600">
+                              Wrong Answers
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Weak Concepts */}
+                        {result.quiz.concepts_weak_in &&
+                          result.quiz.concepts_weak_in.length > 0 && (
+                            <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-4">
+                              <div className="flex items-start gap-3">
+                                <span className="text-2xl">⚠️</span>
+                                <div className="w-full">
+                                  <h4 className="font-semibold text-yellow-800 mb-2">
+                                    Areas to Improve
+                                  </h4>
+                                  <ul className="space-y-2">
+                                    {Array.isArray(
+                                      result.quiz.concepts_weak_in
+                                    ) ? (
+                                      result.quiz.concepts_weak_in.map(
+                                        (concept, idx) => (
+                                          <li
+                                            key={idx}
+                                            className="text-sm text-yellow-700 flex items-start gap-2"
+                                          >
+                                            <span className="text-yellow-500 mt-1">
+                                              •
+                                            </span>
+                                            <span>{concept}</span>
+                                          </li>
+                                        )
+                                      )
+                                    ) : (
+                                      <li className="text-sm text-yellow-700">
+                                        {result.quiz.concepts_weak_in}
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                       </div>
                     )}
 
-                    <div className="bg-blue-50 p-3 rounded border-l-2 border-blue-500">
-                      <p className="text-sm font-semibold text-blue-900 mb-1 flex items-center gap-1">
-                        <FaInfoCircle /> Explanation:
-                      </p>
-                      <p className="text-sm text-blue-800">
-                        {question.explanation}
-                      </p>
-                    </div>
+                    {/* Flashcard Results */}
+                    {isFlashcard && result.flashcard && (
+                      <div className="space-y-4">
+                        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4">
+                          📚 Flashcard Review
+                        </h3>
+
+                        {/* Score Display */}
+                        {result.flashcard.score && (
+                          <div className="bg-white rounded-lg p-6 shadow-sm border-2 border-indigo-200">
+                            <div className="text-center">
+                              <span className="text-sm font-semibold text-gray-600 mb-2 block">
+                                Your Score
+                              </span>
+                              <div className="text-5xl font-bold text-indigo-600 mb-2">
+                                {result.flashcard.score}
+                              </div>
+                              <p className="text-gray-600 text-sm">
+                                {(() => {
+                                  const [correct, total] =
+                                    result.flashcard.score
+                                      .split("/")
+                                      .map(Number);
+                                  return `${Math.round(
+                                    (correct / total) * 100
+                                  )}% Correct`;
+                                })()}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Focus Areas */}
+                        {result.flashcard.concepts_weak_in &&
+                          result.flashcard.concepts_weak_in.length > 0 && (
+                            <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-5">
+                              <div className="flex items-start gap-3">
+                                <span className="text-2xl">🎯</span>
+                                <div className="w-full">
+                                  <h4 className="font-semibold text-purple-800 mb-2">
+                                    Focus Areas
+                                  </h4>
+                                  <ul className="space-y-2 mb-4">
+                                    {Array.isArray(
+                                      result.flashcard.concepts_weak_in
+                                    ) ? (
+                                      result.flashcard.concepts_weak_in.map(
+                                        (concept, idx) => (
+                                          <li
+                                            key={idx}
+                                            className="text-sm text-purple-700 flex items-start gap-2"
+                                          >
+                                            <span className="text-purple-500 mt-1">
+                                              •
+                                            </span>
+                                            <span>{concept}</span>
+                                          </li>
+                                        )
+                                      )
+                                    ) : (
+                                      <li className="text-sm text-purple-700">
+                                        {result.flashcard.concepts_weak_in}
+                                      </li>
+                                    )}
+                                  </ul>
+                                  <div className="mt-4 bg-purple-100 rounded-lg p-3">
+                                    <p className="text-xs text-purple-600">
+                                      💡 <strong>Tip:</strong> Review these
+                                      concepts using the flashcard mode to
+                                      strengthen your understanding.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -286,11 +458,17 @@ function QuizDisplay({ data, mode, onClose }) {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={Object.keys(userAnswers).length !== data.length}
+                  disabled={
+                    Object.keys(userAnswers).length !== data.length ||
+                    analysisLoading
+                  }
                   className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  Submit Flashcards ({Object.keys(userAnswers).length}/
-                  {data.length} answered)
+                  {analysisLoading
+                    ? "Analyzing..."
+                    : `Submit Flashcards (${Object.keys(userAnswers).length}/${
+                        data.length
+                      } answered)`}
                 </button>
               </div>
             </>
@@ -379,11 +557,17 @@ function QuizDisplay({ data, mode, onClose }) {
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={Object.keys(userAnswers).length !== data.length}
+                  disabled={
+                    Object.keys(userAnswers).length !== data.length ||
+                    analysisLoading
+                  }
                   className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  Submit Quiz ({Object.keys(userAnswers).length}/{data.length}{" "}
-                  answered)
+                  {analysisLoading
+                    ? "Analyzing..."
+                    : `Submit Quiz (${Object.keys(userAnswers).length}/${
+                        data.length
+                      } answered)`}
                 </button>
               </div>
             </>
@@ -547,6 +731,16 @@ export default function Assigned({ activeSubject }) {
           data={quizData}
           mode={selectedMode}
           onClose={() => setQuizData(null)}
+          sessionId={sessionId}
+          selectedClass={selectedClass}
+          selectedSubject={selectedSubject}
+          selectedChapter={
+            chapters.find((ch) => ch.number === parseInt(selectedChapter))
+              ?.title || ""
+          }
+          selectedTopic={selectedTopic}
+          selectedDifficulty={selectedDifficulty}
+          selectedQuestionCount={selectedQuestionCount}
         />
       )}
 
