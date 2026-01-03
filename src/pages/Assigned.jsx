@@ -18,7 +18,8 @@ const CLASSES = ["8", "9", "10"];
 const DIFFICULTIES = ["easy", "medium", "hard"];
 const DIFFICULTIES_DISPLAY = { easy: "Easy", medium: "Medium", hard: "Hard" };
 const QUESTION_COUNTS = ["5", "10", "15", "20"];
-const API_BASE_URL = "http://localhost:8000";
+// const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "http://13.235.33.59:8000";
 
 // Generate random session ID (8 digits)
 const generateSessionId = () => {

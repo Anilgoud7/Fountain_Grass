@@ -293,8 +293,7 @@ function AITutor() {
     const effectiveAudioState =
       forceAudioState !== null ? forceAudioState : isAudioEnabled;
 
-    const wsUrl = `ws://localhost:8000/ws/${newSessionId}?agent_type=${selectedSubject?.toLowerCase()}&is_audio=${effectiveAudioState}&user_id=${selectedUserId}&subject=${selectedSubject}&chapter=${selectedChapter}&topic=${selectedTopic}&mode=${selectedMode}`;
-
+    const wsUrl = `ws://13.235.33.59:8000/ws/${newSessionId}?agent_type=${selectedSubject?.toLowerCase()}&is_audio=${effectiveAudioState}&user_id=${selectedUserId}&subject=${selectedSubject}&chapter=${selectedChapter}&topic=${selectedTopic}&mode=${selectedMode}`;
     console.log("=== Connecting WebSocket ===");
     console.log("URL:", wsUrl);
     console.log("Audio enabled:", effectiveAudioState);
@@ -519,7 +518,8 @@ function AITutor() {
     setAnalysisStatus("loading");
 
     try {
-      const response = await fetch("http://localhost:8000/api/analyzer", {
+      const response = await fetch("http://13.235.33.59:8000/api/analyzer", {
+        // const response = await fetch("http://localhost:8000/api/analyzer", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -553,7 +553,7 @@ function AITutor() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/result/${currentSessionId}`
+        `http://13.235.33.59:8000/result/${currentSessionId}`
       );
       const data = await response.json();
 
